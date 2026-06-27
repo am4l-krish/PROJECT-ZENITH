@@ -338,7 +338,7 @@ export default function AsteroidMonitor() {
         desiredLook = astPos.clone()
       } else {
         const mx = mouseRef.current.x * 0.5, my = mouseRef.current.y * 0.3
-        desiredCam  = new THREE.Vector3(mx, my, 11)
+        desiredCam  = new THREE.Vector3(mx, my, 10)
         desiredLook = new THREE.Vector3(0, 0, 0)
       }
 
