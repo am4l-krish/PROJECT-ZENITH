@@ -15,7 +15,7 @@ function useStarfield(canvasRef) {
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    let raf, stars = [], W, H
+    let raf, stars = [], shooters = [], W, H, nextShootAt = 1.4
 
     function resize() {
       W = canvas.width = canvas.clientWidth * devicePixelRatio
@@ -33,11 +33,32 @@ function useStarfield(canvasRef) {
     resize()
     window.addEventListener('resize', resize)
 
+    // Spawn one shooting star at a time, entering from a random edge near the
+    // top and streaking diagonally down-left or down-right with a fading tail.
+    function spawnShooter() {
+      const dpr = devicePixelRatio
+      const dir = Math.random() < 0.5 ? 1 : -1
+      const slope = Math.PI * 0.16 + Math.random() * Math.PI * 0.16 // ~29°–58° from horizontal
+      shooters.push({
+        x: dir > 0 ? Math.random() * W * 0.5 - W * 0.1 : W * 0.6 + Math.random() * W * 0.5,
+        y: -H * 0.04 + Math.random() * H * 0.32,
+        dx: Math.cos(slope) * dir,
+        dy: Math.sin(slope),
+        speed: (380 + Math.random() * 300) * dpr,
+        len: (170 + Math.random() * 210) * dpr,
+        width: (1.1 + Math.random() * 0.9) * dpr,
+        life: 0,
+        maxLife: 0.6 + Math.random() * 0.5,
+        opacity: 0.55 + Math.random() * 0.35,
+      })
+    }
+
     let t = 0
     function tick() {
       raf = requestAnimationFrame(tick)
       t += 0.016
       ctx.clearRect(0, 0, W, H)
+
       for (const s of stars) {
         s.y += s.drift
         if (s.y > H) s.y = 0
@@ -45,6 +66,45 @@ function useStarfield(canvasRef) {
         ctx.beginPath()
         ctx.fillStyle = `rgba(190,225,255,${b})`
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      if (t > nextShootAt && shooters.length < 2) {
+        spawnShooter()
+        nextShootAt = t + 2.6 + Math.random() * 4.4
+      }
+
+      for (let i = shooters.length - 1; i >= 0; i--) {
+        const m = shooters[i]
+        m.life += 0.016
+        const progress = m.life / m.maxLife
+        if (progress >= 1) { shooters.splice(i, 1); continue }
+
+        const dist = m.speed * m.life
+        const headX = m.x + m.dx * dist
+        const headY = m.y + m.dy * dist
+        const tailX = headX - m.dx * m.len
+        const tailY = headY - m.dy * m.len
+
+        const fadeIn = Math.min(1, progress / 0.12)
+        const fadeOut = Math.min(1, (1 - progress) / 0.5)
+        const alpha = fadeIn * fadeOut * m.opacity
+
+        const grad = ctx.createLinearGradient(tailX, tailY, headX, headY)
+        grad.addColorStop(0, 'rgba(180,220,255,0)')
+        grad.addColorStop(0.7, `rgba(190,230,255,${alpha * 0.6})`)
+        grad.addColorStop(1, `rgba(255,255,255,${alpha})`)
+        ctx.strokeStyle = grad
+        ctx.lineWidth = m.width
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(tailX, tailY)
+        ctx.lineTo(headX, headY)
+        ctx.stroke()
+
+        ctx.beginPath()
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`
+        ctx.arc(headX, headY, m.width * 1.4, 0, Math.PI * 2)
         ctx.fill()
       }
     }
@@ -77,7 +137,7 @@ export default function LandingPage() {
   function handleEnter() {
     if (zooming) return
     setZooming(true)
-    setTimeout(() => navigate('/asteroids'), 680)
+    setTimeout(() => navigate('/asteroids'), 760)
   }
 
   return (
@@ -150,19 +210,18 @@ const styles = {
   },
   contentLayer: {
     position: 'absolute', inset: 0,
-    transition: 'transform 700ms cubic-bezier(0.5, 0, 1, 0.4), opacity 700ms ease',
-    transformOrigin: '50% 0%',
+    transition: 'transform 760ms cubic-bezier(0.65, 0, 0.35, 1), opacity 760ms ease',
   },
   contentLayerFlowing: {
-    transform: 'translateY(70vh) scale(1.5)',
+    transform: 'translateY(-100vh)',
     opacity: 0,
   },
   starsLayer: {
     position: 'absolute', inset: 0,
-    transition: 'transform 700ms cubic-bezier(0.4, 0, 1, 0.3)',
+    transition: 'transform 760ms cubic-bezier(0.65, 0, 0.35, 1)',
   },
   starsLayerFlowing: {
-    transform: 'scaleY(2.6) scaleX(0.94) translateY(8%)',
+    transform: 'translateY(-35vh)',
   },
 
   canvas: { position: 'absolute', inset: 0, width: '100%', height: '100%' },

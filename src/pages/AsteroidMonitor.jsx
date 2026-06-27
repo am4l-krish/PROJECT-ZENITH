@@ -5,12 +5,12 @@ import { API, getDateRange, threatScore, threatLevel, threatLabel } from '../uti
 const COLOR = { safe: 0x00ff88, moderate: 0xffcc00, danger: 0xff4444 }
 const COLOR_CSS = { safe: 'var(--green)', moderate: 'var(--yellow)', danger: 'var(--red)' }
 
-// ── 2D starfield (same as LandingPage) ───────────────────────────────────────
+// ── 2D starfield ───────────────────────────────────────────────────────────────
 function useStarfield(canvasRef) {
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    let raf, stars = [], W, H
+    let raf, stars = [], shooters = [], W, H, nextShootAt = 1.4
 
     function resize() {
       W = canvas.width = canvas.clientWidth * devicePixelRatio
@@ -28,11 +28,30 @@ function useStarfield(canvasRef) {
     resize()
     window.addEventListener('resize', resize)
 
+    function spawnShooter() {
+      const dpr = devicePixelRatio
+      const dir = Math.random() < 0.5 ? 1 : -1
+      const slope = Math.PI * 0.16 + Math.random() * Math.PI * 0.16
+      shooters.push({
+        x: dir > 0 ? Math.random() * W * 0.5 - W * 0.1 : W * 0.6 + Math.random() * W * 0.5,
+        y: -H * 0.04 + Math.random() * H * 0.32,
+        dx: Math.cos(slope) * dir,
+        dy: Math.sin(slope),
+        speed: (380 + Math.random() * 300) * dpr,
+        len: (170 + Math.random() * 210) * dpr,
+        width: (1.1 + Math.random() * 0.9) * dpr,
+        life: 0,
+        maxLife: 0.6 + Math.random() * 0.5,
+        opacity: 0.55 + Math.random() * 0.35,
+      })
+    }
+
     let t = 0
     function tick() {
       raf = requestAnimationFrame(tick)
       t += 0.016
       ctx.clearRect(0, 0, W, H)
+
       for (const s of stars) {
         s.y += s.drift
         if (s.y > H) s.y = 0
@@ -40,6 +59,45 @@ function useStarfield(canvasRef) {
         ctx.beginPath()
         ctx.fillStyle = `rgba(190,225,255,${b})`
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      if (t > nextShootAt && shooters.length < 2) {
+        spawnShooter()
+        nextShootAt = t + 2.6 + Math.random() * 4.4
+      }
+
+      for (let i = shooters.length - 1; i >= 0; i--) {
+        const m = shooters[i]
+        m.life += 0.016
+        const progress = m.life / m.maxLife
+        if (progress >= 1) { shooters.splice(i, 1); continue }
+
+        const dist = m.speed * m.life
+        const headX = m.x + m.dx * dist
+        const headY = m.y + m.dy * dist
+        const tailX = headX - m.dx * m.len
+        const tailY = headY - m.dy * m.len
+
+        const fadeIn = Math.min(1, progress / 0.12)
+        const fadeOut = Math.min(1, (1 - progress) / 0.5)
+        const alpha = fadeIn * fadeOut * m.opacity
+
+        const grad = ctx.createLinearGradient(tailX, tailY, headX, headY)
+        grad.addColorStop(0, 'rgba(180,220,255,0)')
+        grad.addColorStop(0.7, `rgba(190,230,255,${alpha * 0.6})`)
+        grad.addColorStop(1, `rgba(255,255,255,${alpha})`)
+        ctx.strokeStyle = grad
+        ctx.lineWidth = m.width
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(tailX, tailY)
+        ctx.lineTo(headX, headY)
+        ctx.stroke()
+
+        ctx.beginPath()
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`
+        ctx.arc(headX, headY, m.width * 1.4, 0, Math.PI * 2)
         ctx.fill()
       }
     }
@@ -58,7 +116,6 @@ function buildScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
   renderer.setSize(W, H)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  // Transparent background so the 2D starfield canvas shows through
   renderer.setClearColor(0x000000, 0)
 
   // Earth
@@ -218,15 +275,15 @@ function ellipsePoint(a, b, tiltX, tiltZ, theta) {
 }
 
 export default function AsteroidMonitor() {
-  const canvasRef    = useRef(null)   // Three.js canvas
-  const starCanvasRef = useRef(null)  // 2D starfield canvas
-  const sceneRef     = useRef(null)
-  const asteroidsRef = useRef([])
-  const animRef      = useRef(null)
-  const mouseRef     = useRef({ x: 0, y: 0 })
-  const autoRotRef   = useRef(true)
-  const zoomTargetRef   = useRef(null)
-  const lookTargetRef   = useRef(new THREE.Vector3(0, 0, 0))
+  const canvasRef     = useRef(null)
+  const starCanvasRef = useRef(null)
+  const sceneRef      = useRef(null)
+  const asteroidsRef  = useRef([])
+  const animRef       = useRef(null)
+  const mouseRef      = useRef({ x: 0, y: 0 })
+  const autoRotRef    = useRef(true)
+  const zoomTargetRef = useRef(null)
+  const lookTargetRef = useRef(new THREE.Vector3(0, 0, 0))
 
   const [asteroids, setAsteroids] = useState([])
   const [selected, setSelected]   = useState(null)
@@ -241,9 +298,16 @@ export default function AsteroidMonitor() {
   const [input, setInput]         = useState('')
   const [thinking, setThinking]   = useState(false)
   const chatEndRef                = useRef(null)
+  const [entered, setEntered]     = useState(false)
 
-  // Boot 2D starfield
   useStarfield(starCanvasRef)
+
+  // Simple fade-in — no translateY, so there's no motion clash with
+  // the landing page's upward exit animation.
+  useEffect(() => {
+    const id = setTimeout(() => setEntered(true), 20)
+    return () => clearTimeout(id)
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -278,6 +342,7 @@ export default function AsteroidMonitor() {
         desiredLook = new THREE.Vector3(0, 0, 0)
       }
 
+      // Exponential smoothing — frame-rate independent, no spring bounce
       const camAlpha  = 1 - Math.exp(-2.2 * delta)
       const lookAlpha = 1 - Math.exp(-1.8 * delta)
       camera.position.lerp(desiredCam, camAlpha)
@@ -418,7 +483,6 @@ export default function AsteroidMonitor() {
     })
   }, [filter])
 
-
   async function sendMessage() {
     const text = input.trim()
     if (!text || thinking) return
@@ -470,33 +534,36 @@ export default function AsteroidMonitor() {
   return (
     <div style={{
       width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden',
-      // Landing page background
       background: 'radial-gradient(ellipse at 50% 20%, #050b18 0%, #00030a 60%, #000103 100%)',
+      // Pure opacity fade — no translateY so there's zero motion clash with
+      // the landing page sliding upward on exit.
+      opacity: entered ? 1 : 0,
+      transition: 'opacity 500ms ease 40ms',
     }}>
-      {/* 2D starfield — same as landing page, sits behind Three.js */}
+      {/* 2D starfield — sits behind Three.js canvas */}
       <canvas ref={starCanvasRef} style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
         pointerEvents: 'none',
       }} />
 
-      {/* Vignette — same as landing page */}
+      {/* Vignette */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,2,6,0.75) 100%)',
         zIndex: 1,
       }} />
 
-      {/* Three.js canvas — alpha:true so background shows through */}
+      {/* Three.js canvas — alpha:true so starfield shows through */}
       <canvas ref={canvasRef} style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
         display: 'block', zIndex: 2,
       }} />
 
-      {/* UI overlays */}
+      {/* Stats — bottom left */}
       <div style={{ position: 'absolute', bottom: 28, left: 28, display: 'flex', gap: 20, alignItems: 'flex-end', zIndex: 10 }}>
         {[
-          { label: 'Tracked',   value: loading ? '—' : stats.total,     color: 'var(--cyan)' },
-          { label: 'Hazardous', value: loading ? '—' : stats.hazardous, color: 'var(--red)'  },
+          { label: 'Tracked',   value: loading ? '—' : stats.total,     color: 'var(--cyan)'   },
+          { label: 'Hazardous', value: loading ? '—' : stats.hazardous, color: 'var(--red)'    },
           { label: 'Closest',   value: stats.closest,                    color: 'var(--yellow)' },
         ].map(s => (
           <div key={s.label} style={{ background: 'rgba(0,4,12,0.7)', border: '1px solid rgba(125,249,255,0.15)', borderRadius: 10, padding: '10px 16px', backdropFilter: 'blur(10px)' }}>
@@ -506,6 +573,7 @@ export default function AsteroidMonitor() {
         ))}
       </div>
 
+      {/* Legend — bottom right */}
       <div style={{ position: 'absolute', bottom: 28, right: 92, display: 'flex', gap: 14, alignItems: 'center', zIndex: 10 }}>
         {[['var(--green)', 'Safe'], ['var(--yellow)', 'Moderate'], ['var(--red)', 'Hazardous']].map(([c, l]) => (
           <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'rgba(255,255,255,0.4)', letterSpacing: 1 }}>
@@ -514,15 +582,18 @@ export default function AsteroidMonitor() {
         ))}
       </div>
 
+      {/* Filter buttons */}
       <div style={{ position: 'absolute', top: 68, right: 20, display: 'flex', gap: 8, zIndex: 10 }}>
         <button className={`btn${filter === 'all' ? ' active' : ''}`} onClick={() => setFilter('all')}>All</button>
         <button className={`btn${filter === 'hazardous' ? ' active' : ''}`} onClick={() => setFilter('hazardous')}>Hazardous Only</button>
       </div>
 
+      {/* Lunar orbit label */}
       <div style={{ position: 'absolute', top: '50%', right: 28, transform: 'translateY(-50%)', fontSize: 9, color: 'rgba(125,249,255,0.25)', letterSpacing: 1.5, writingMode: 'vertical-rl', zIndex: 10 }}>
         LUNAR ORBIT REFERENCE
       </div>
 
+      {/* Hover tooltip */}
       {hovered && (
         <div style={{
           position: 'fixed', left: hovered.x + 14, top: hovered.y - 16, pointerEvents: 'none',
@@ -534,6 +605,7 @@ export default function AsteroidMonitor() {
         </div>
       )}
 
+      {/* Loading */}
       {loading && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
@@ -544,6 +616,7 @@ export default function AsteroidMonitor() {
         </div>
       )}
 
+      {/* Detail panel */}
       {selected && (
         <div style={{
           position: 'absolute', top: '50%', right: 20, transform: 'translateY(-50%)',
@@ -619,7 +692,6 @@ export default function AsteroidMonitor() {
           borderRadius: 16, backdropFilter: 'blur(20px)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}>
-          {/* Header */}
           <div style={{
             padding: '14px 18px', borderBottom: '1px solid rgba(125,249,255,0.1)',
             display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
@@ -632,7 +704,7 @@ export default function AsteroidMonitor() {
             }}>✦</div>
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--cyan)', letterSpacing: 2 }}>AI SPACE GUIDE</div>
-              <div style={{ fontSize: 9, color: 'rgba(125,249,255,0.4)', letterSpacing: 1, marginTop: 1 }}>POWERED BY CLAUDE</div>
+              <div style={{ fontSize: 9, color: 'rgba(125,249,255,0.4)', letterSpacing: 1, marginTop: 1 }}>POWERED BY GROQ</div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 5px var(--green)' }} />
@@ -640,7 +712,6 @@ export default function AsteroidMonitor() {
             </div>
           </div>
 
-          {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {messages.map((m, i) => (
               <div key={i} style={{
@@ -656,7 +727,8 @@ export default function AsteroidMonitor() {
                   }}>✦</div>
                 )}
                 <div style={{
-                  maxWidth: '80%', padding: '8px 12px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                  maxWidth: '80%', padding: '8px 12px',
+                  borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                   background: m.role === 'user' ? 'rgba(125,249,255,0.1)' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${m.role === 'user' ? 'rgba(125,249,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
                   fontSize: 12, color: m.role === 'user' ? 'rgba(230,245,255,0.9)' : 'rgba(210,230,250,0.8)',
@@ -692,7 +764,6 @@ export default function AsteroidMonitor() {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Input */}
           <div style={{
             padding: '12px 14px', borderTop: '1px solid rgba(125,249,255,0.1)',
             display: 'flex', gap: 8, flexShrink: 0,
@@ -724,7 +795,6 @@ export default function AsteroidMonitor() {
           </div>
         </div>
       )}
-
     </div>
   )
 }
