@@ -3,6 +3,7 @@ import { API } from '../utils/api.js'
 
 export default function ISSTracker() {
   const [pos, setPos] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [trail, setTrail] = useState([])
   const mapRef = useRef(null)
   const leafletRef = useRef(null)
@@ -34,6 +35,7 @@ export default function ISSTracker() {
         .then(r => r.json())
         .then(data => {
           setPos(data)
+          setLoading(false)
           setTrail(prev => {
             const next = [...prev, [data.latitude, data.longitude]].slice(-80)
             markerRef.current?.setLatLng([data.latitude, data.longitude])
@@ -41,7 +43,7 @@ export default function ISSTracker() {
             return next
           })
         })
-        .catch(() => {})
+        .catch(() => setLoading(false))
     }
 
     fetchISS()
@@ -56,7 +58,12 @@ export default function ISSTracker() {
           <h2>ISS Tracker</h2>
           <p>Live International Space Station position · Updates every 5 seconds</p>
         </div>
-        {pos && (
+        {loading && (
+  <div style={{ textAlign: 'center', padding: '60px 0', letterSpacing: 2, color: 'rgba(125,249,255,0.4)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+    FETCHING ISS POSITION...
+  </div>
+)}
+        {pos && !loading && (
           <div className="grid-4" style={{ marginBottom: 16 }}>
             {[
               ['Latitude', `${pos.latitude?.toFixed(4)}°`],

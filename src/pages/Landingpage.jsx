@@ -181,21 +181,7 @@ export default function LandingPage() {
           </button>
         </div>
 
-        <div style={{ ...styles.manifest, ...(zooming ? { pointerEvents: 'none' } : {}) }}>
-          {MODULES.map(m => (
-            <div
-              key={m.id}
-              style={styles.manifestItem}
-              onClick={() => navigate(m.path)}
-            >
-              <span style={styles.manifestId}>{m.id}</span>
-              <div>
-                <div style={styles.manifestName}>{m.name}</div>
-                <div style={styles.manifestDesc}>{m.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+      
       </div>
 
     </div>
