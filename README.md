@@ -18,7 +18,7 @@ Project Zenith is a full-screen interactive space dashboard built with React, Vi
 | ISS Tracker | ✅ Live | Real-time ISS position on a Leaflet map |
 | AI Space Guide | ✅ Live | Groq-powered chat assistant for space questions |
 | Cosmic Learning Hub | ✅ Live | NASA APOD daily image and learning content |
-| Space Weather | 🔧 Stub | Placeholder — ready to build |
+| Space Weather | 🔧 Stub | NASA DONKI API |
 | Orbit Explorer | 🔧 Stub | Placeholder — ready to build |
 | Observation Planner | 🔧 Stub | Placeholder — ready to build |
 
