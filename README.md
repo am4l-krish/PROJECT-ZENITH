@@ -18,7 +18,7 @@ Project Zenith is a full-screen interactive space dashboard built with React, Vi
 | ISS Tracker | ✅ Live | Real-time ISS position on a Leaflet map |
 | AI Space Guide | ✅ Live | Groq-powered chat assistant for space questions |
 | Cosmic Learning Hub | ✅ Live | NASA APOD daily image and learning content |
-| Space Weather | 🔧 Stub | NASA DONKI API |
+| Space Weather | Live | NASA DONKI API |
 | Orbit Explorer | 🔧 Stub | Placeholder — ready to build |
 | Observation Planner | 🔧 Stub | Placeholder — ready to build |
 
@@ -59,12 +59,14 @@ VITE_GROQ_API_KEY=your_groq_api_key_here
 **NASA API Key** (free)
 - Go to [https://api.nasa.gov](https://api.nasa.gov)
 - Click "Generate API Key"
-- Used for: Asteroid NeoWs feed, APOD
+- Used for: Asteroid NeoWs feed, APOD,DONKI 
 
 **Groq API Key** (free tier available)
 - Go to [https://console.groq.com](https://console.groq.com)
 - Create an account → API Keys → Create key
 - Used for: AI Space Guide chat
+
+
 
 ### 4. Run locally
 
