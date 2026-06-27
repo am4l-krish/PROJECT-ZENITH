@@ -86,7 +86,7 @@ project-zenith/
 │   │   ├── ISSTracker.jsx        # Live ISS position
 │   │   ├── AISpaceGuide.jsx      # Groq-powered chat
 │   │   ├── CosmicLearningHub.jsx # NASA APOD
-│   │   ├── SpaceWeather.jsx      # Stub
+│   │   ├── SpaceWeather.jsx      # NASA DONKI API
 │   │   ├── OrbitExplorer.jsx     # Stub
 │   │   └── ObservationPlanner.jsx# Stub
 │   ├── components/
